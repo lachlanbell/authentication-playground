@@ -19,7 +19,7 @@ impl Hasher {
     }
 
     pub async fn hash(&self, user_id: String, password: String) -> Result<Vec<u8>> {
-        let key = self.kdf(user_id).await;
+        let key = self.kdf(user_id).await?;
         let secret_box = SecretBox::new(&key);
 
         let hash = task::spawn_blocking(move || {
@@ -28,14 +28,13 @@ impl Hasher {
                 .hash_password(password.as_bytes(), &salt)
                 .map(|hash| hash.to_string().into_bytes())
         })
-        .await
-        .unwrap()?;
+        .await??;
 
         Ok(secret_box.seal(&hash))
     }
 
     pub async fn verify(&self, user_id: String, password: String, hash: Vec<u8>) -> Result<bool> {
-        let key = self.kdf(user_id).await;
+        let key = self.kdf(user_id).await?;
         let secret_box = SecretBox::new(&key);
 
         let Ok(decrypted_hash) = secret_box.open(&hash) else {
@@ -55,13 +54,12 @@ impl Hasher {
                 Err(e) => Err(e.into()),
             }
         })
-        .await
-        .unwrap()
+        .await?
     }
 }
 
 impl Hasher {
-    async fn kdf(&self, user_id: String) -> [u8; secret_box::KEY_BYTES] {
+    async fn kdf(&self, user_id: String) -> Result<[u8; secret_box::KEY_BYTES]> {
         let mut key = [0; secret_box::KEY_BYTES];
 
         let mut salt_hasher = Blake2b512::new();
@@ -71,14 +69,11 @@ impl Hasher {
         let pepper = self.pepper.clone();
 
         task::spawn_blocking(move || {
-            Argon2::default()
-                .hash_password_into(pepper.as_bytes(), &salt, &mut key)
-                .unwrap();
+            Argon2::default().hash_password_into(pepper.as_bytes(), &salt, &mut key)?;
 
-            key
+            Ok(key)
         })
-        .await
-        .unwrap()
+        .await?
     }
 }
 
