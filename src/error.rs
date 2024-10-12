@@ -21,7 +21,7 @@ pub enum Error {
     PasswordHashError(argon2::password_hash::Error),
 
     /// Tokio task join error.
-    JoinError,
+    JoinError(String),
 }
 
 impl fmt::Display for Error {
@@ -32,7 +32,7 @@ impl fmt::Display for Error {
             Error::CiphertextTooShort => "the ciphertext is too short",
             Error::Argon2Error(inner) => return write!(f, "internal error within argon2: {inner}"),
             Error::PasswordHashError(inner) => return write!(f, "password hash error: {inner}"),
-            Error::JoinError => "tokio task failed to join",
+            Error::JoinError(inner) => return write!(f, "tokio task failed to join: {inner}"),
         })
     }
 }
@@ -50,7 +50,7 @@ impl From<argon2::password_hash::Error> for Error {
 }
 
 impl From<tokio::task::JoinError> for Error {
-    fn from(_value: tokio::task::JoinError) -> Self {
-        Error::JoinError
+    fn from(value: tokio::task::JoinError) -> Self {
+        Error::JoinError(value.to_string())
     }
 }
