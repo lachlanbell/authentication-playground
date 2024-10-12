@@ -96,18 +96,12 @@ fn generate_nonce() -> [u8; NONCE_BYTES] {
 #[test]
 fn test_secretbox() {
     let message = "Hello, world!".as_bytes();
-    dbg!(&message);
 
     let key: [u8; KEY_BYTES] = [2; KEY_BYTES];
-
     let secret_box = SecretBox::new(&key);
-
     let ciphertext = secret_box.seal(message);
-    dbg!(&ciphertext);
 
     let decrypted = secret_box.open(&ciphertext).unwrap();
-    dbg!(&decrypted);
-
     assert_eq!(message, decrypted);
 }
 
@@ -139,9 +133,6 @@ fn test_empty_message() {
     let ciphertext = secret_box.seal(&message);
 
     assert_eq!(ciphertext.len(), MAC_BYTES + NONCE_BYTES);
-
-    dbg!(&ciphertext);
-
     assert_eq!(secret_box.open(&ciphertext), Ok(vec![]));
 }
 
