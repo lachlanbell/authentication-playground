@@ -108,10 +108,7 @@ fn test_secretbox() {
 #[test]
 fn test_nonce_ne() {
     // Sanity check.
-    assert_ne!(
-        generate_nonce(),
-        generate_nonce()
-    );
+    assert_ne!(generate_nonce(), generate_nonce());
 }
 
 #[test]
