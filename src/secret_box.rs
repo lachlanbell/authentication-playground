@@ -112,6 +112,15 @@ fn test_secretbox() {
 }
 
 #[test]
+fn test_nonce_ne() {
+    // Sanity check.
+    assert_ne!(
+        generate_nonce(),
+        generate_nonce()
+    );
+}
+
+#[test]
 fn test_bad_length() {
     let key: [u8; KEY_BYTES] = [2; KEY_BYTES];
 
