@@ -8,6 +8,9 @@ pub enum Error {
     /// Internal error within libsodium.
     SodiumError,
 
+    /// Invalid key length.
+    InvalidKeyLength,
+
     /// The message could not be authenticated.
     ForgedMessage,
 
@@ -28,6 +31,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Error::SodiumError => "internal error within libsodium",
+            Error::InvalidKeyLength => "invalid key length",
             Error::ForgedMessage => "the message could not be authenticated",
             Error::CiphertextTooShort => "the ciphertext is too short",
             Error::Argon2Error(inner) => return write!(f, "internal error within argon2: {inner}"),

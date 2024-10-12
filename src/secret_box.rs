@@ -20,11 +20,15 @@ pub fn init() -> Result<()> {
 }
 
 impl SecretBox<'_> {
-    pub fn new(key: &[u8]) -> SecretBox<'_> {
+    pub fn new(key: &[u8]) -> Result<SecretBox<'_>> {
         #[cfg(test)]
         init().unwrap();
 
-        SecretBox { key }
+        if key.len() != KEY_BYTES {
+            return Err(Error::InvalidKeyLength);
+        }
+
+        Ok(SecretBox { key })
     }
 
     pub fn seal(&self, message: &[u8]) -> Vec<u8> {
@@ -98,7 +102,7 @@ fn test_secretbox() {
     let message = "Hello, world!".as_bytes();
 
     let key: [u8; KEY_BYTES] = [2; KEY_BYTES];
-    let secret_box = SecretBox::new(&key);
+    let secret_box = SecretBox::new(&key).unwrap();
     let ciphertext = secret_box.seal(message);
 
     let decrypted = secret_box.open(&ciphertext).unwrap();
@@ -112,13 +116,22 @@ fn test_nonce_ne() {
 }
 
 #[test]
-fn test_bad_length() {
+fn test_bad_ciphertext_length() {
     let key: [u8; KEY_BYTES] = [2; KEY_BYTES];
 
-    let secret_box = SecretBox::new(&key);
+    let secret_box = SecretBox::new(&key).unwrap();
 
     let ciphertext = [1u8; (MAC_BYTES + NONCE_BYTES - 1)];
     assert_eq!(secret_box.open(&ciphertext), Err(Error::CiphertextTooShort));
+}
+
+#[test]
+fn test_bad_key_length() {
+    let key: [u8; KEY_BYTES - 1] = [2; KEY_BYTES - 1];
+    assert_eq!(SecretBox::new(&key).err(), Some(Error::InvalidKeyLength));
+
+    let key: [u8; KEY_BYTES + 1] = [2; KEY_BYTES + 1];
+    assert_eq!(SecretBox::new(&key).err(), Some(Error::InvalidKeyLength));
 }
 
 #[test]
@@ -126,7 +139,7 @@ fn test_empty_message() {
     let message: Vec<u8> = vec![];
     let key: [u8; KEY_BYTES] = [2; KEY_BYTES];
 
-    let secret_box = SecretBox::new(&key);
+    let secret_box = SecretBox::new(&key).unwrap();
     let ciphertext = secret_box.seal(&message);
 
     assert_eq!(ciphertext.len(), MAC_BYTES + NONCE_BYTES);

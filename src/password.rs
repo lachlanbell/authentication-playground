@@ -20,7 +20,7 @@ impl Hasher {
 
     pub async fn hash(&self, user_id: String, password: String) -> Result<Vec<u8>> {
         let key = self.kdf(user_id).await?;
-        let secret_box = SecretBox::new(&key);
+        let secret_box = SecretBox::new(&key).unwrap();
 
         let hash = task::spawn_blocking(move || {
             let salt = SaltString::generate(rand::thread_rng());
@@ -35,7 +35,7 @@ impl Hasher {
 
     pub async fn verify(&self, user_id: String, password: String, hash: Vec<u8>) -> Result<bool> {
         let key = self.kdf(user_id).await?;
-        let secret_box = SecretBox::new(&key);
+        let secret_box = SecretBox::new(&key).unwrap();
 
         let Ok(decrypted_hash) = secret_box.open(&hash) else {
             return Ok(false);
