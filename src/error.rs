@@ -3,7 +3,7 @@ use core::fmt;
 pub type Result<T> = core::result::Result<T, Error>;
 
 /// Error type.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Error {
     /// Internal error within libsodium.
     SodiumError,
