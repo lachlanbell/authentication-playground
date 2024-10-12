@@ -1,15 +1,17 @@
-use std::io;
+use std::{io, sync::Arc};
 
+use password::Hasher;
 use secret_box::SecretBox;
 use serde::{Deserialize, Serialize};
 
-use base64::prelude::*;
+use sqlx::SqlitePool;
 
 pub use self::error::{Error, Result};
 
 mod error;
 mod password;
 mod secret_box;
+mod web;
 
 const COOKIE_KEY: [u8; 32] = [
     168, 77, 225, 162, 97, 28, 202, 13, 237, 97, 35, 55, 111, 241, 56, 188, 212, 35, 33, 146, 228,
@@ -25,26 +27,19 @@ struct SessionToken {
 async fn main() -> io::Result<()> {
     secret_box::init().unwrap();
 
-    let cookie_box: SecretBox<'static> = SecretBox::new(&COOKIE_KEY);
+    let token_box = SecretBox::new(&COOKIE_KEY).unwrap();
+    let hasher = Hasher::new("pepper".to_string());
+    let db = SqlitePool::connect(&dotenvy::var("DATABASE_URL").unwrap())
+        .await
+        .unwrap();
 
-    let session = SessionToken {
-        sub: "lachy".into(),
+    let state = web::AppState {
+        token_box: Arc::new(token_box),
+        hasher: Arc::new(hasher),
+        db,
     };
 
-    let token_bytes = serde_json::to_vec(&session).unwrap();
-    let cookie_bytes = cookie_box.seal(&token_bytes);
-
-    let cookie_text = BASE64_URL_SAFE.encode(&cookie_bytes);
-
-    println!("{:?}", cookie_text);
-
-    let input_bytes = BASE64_URL_SAFE
-        .decode("9qhixC9N-nMt24gq3-WqByWW-TKp3Xi3DKjAeB_0EXoz2m_OYXrFHoaMsKXgDXcWprUjGqzhSQ==")
-        .unwrap();
-    println!(
-        "{:?}",
-        std::str::from_utf8(&cookie_box.open(input_bytes.as_slice()).unwrap())
-    );
+    web::serve(state).await;
 
     Ok(())
 }

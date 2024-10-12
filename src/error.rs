@@ -1,5 +1,10 @@
 use core::fmt;
 
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
+
 pub type Result<T> = core::result::Result<T, Error>;
 
 /// Error type.
@@ -56,5 +61,11 @@ impl From<argon2::password_hash::Error> for Error {
 impl From<tokio::task::JoinError> for Error {
     fn from(value: tokio::task::JoinError) -> Self {
         Error::JoinError(value.to_string())
+    }
+}
+
+impl IntoResponse for Error {
+    fn into_response(self) -> Response {
+        StatusCode::INTERNAL_SERVER_ERROR.into_response()
     }
 }
