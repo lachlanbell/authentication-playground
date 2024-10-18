@@ -5,8 +5,8 @@ use sqlx::SqlitePool;
 use crate::{password::Hasher, secret_box::SecretBox};
 
 #[derive(Clone)]
-pub struct AppState<'a> {
-    pub token_box: Arc<SecretBox<'a>>,
+pub struct AppState {
+    pub token_box: Arc<SecretBox<'static>>,
     pub hasher: Arc<Hasher>,
     pub db: SqlitePool,
 }

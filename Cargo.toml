@@ -5,10 +5,11 @@ edition = "2021"
 
 [dependencies]
 argon2 = "0.5.3"
-axum = "0.7.6"
+axum = { version = "0.7.5", features = ["macros"] }
 base64 = "0.22.1"
 blake2 = "0.10.6"
 bytes = "1.7.2"
+chrono = { version = "0.4.38", features = ["serde"] }
 dotenvy = "0.15.7"
 libc = "0.2.159"
 libsodium-sys-stable = { version = "1.21.2", features = ["fetch-latest", "minimal", "optimized"] }
@@ -17,3 +18,4 @@ serde = { version = "1.0.210", features = ["derive"] }
 serde_json = "1.0.128"
 sqlx = { version = "0.8.2", features = ["sqlite", "tls-native-tls", "runtime-tokio", "uuid", "chrono"] }
 tokio = { version = "1.40.0", features = ["full"] }
+uuid = { version = "1.10.0", features = ["serde", "v4"] }

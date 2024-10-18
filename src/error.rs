@@ -30,6 +30,18 @@ pub enum Error {
 
     /// Tokio task join error.
     JoinError(String),
+
+    /// The token bytes could not be parsed.
+    InvalidSessionToken,
+
+    /// The session token has expired.
+    ExpiredSessionToken,
+
+    /// SQLx database error.
+    DatabaseError(String),
+
+    /// The username already exists.
+    UsernameAlreadyExists,
 }
 
 impl fmt::Display for Error {
@@ -42,6 +54,10 @@ impl fmt::Display for Error {
             Error::Argon2Error(inner) => return write!(f, "internal error within argon2: {inner}"),
             Error::PasswordHashError(inner) => return write!(f, "password hash error: {inner}"),
             Error::JoinError(inner) => return write!(f, "tokio task failed to join: {inner}"),
+            Error::InvalidSessionToken => "failed to parse session token",
+            Error::ExpiredSessionToken => "the session token has expired",
+            Error::DatabaseError(inner) => return write!(f, "database error: {inner}"),
+            Error::UsernameAlreadyExists => "the username already exists",
         })
     }
 }
@@ -61,6 +77,12 @@ impl From<argon2::password_hash::Error> for Error {
 impl From<tokio::task::JoinError> for Error {
     fn from(value: tokio::task::JoinError) -> Self {
         Error::JoinError(value.to_string())
+    }
+}
+
+impl From<sqlx::Error> for Error {
+    fn from(value: sqlx::Error) -> Self {
+        Error::DatabaseError(value.to_string())
     }
 }
 
