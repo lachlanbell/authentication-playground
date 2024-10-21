@@ -25,6 +25,7 @@ pub fn routes(state: AppState) -> Router {
         .route("/register", post(register))
         .route("/login", post(login))
         .route("/sessions", get(sessions))
+        .route("/logout", post(logout))
         .with_state(state)
 }
 
@@ -204,6 +205,26 @@ async fn login(
     Ok((
         cookies.add(Cookie::new("session", session_token)),
         Redirect::to("/sessions"),
+    ))
+}
+
+async fn logout(
+    State(state): State<AppState>,
+    cookies: CookieJar,
+    session: Session,
+) -> Result<impl IntoResponse> {
+    sqlx::query!(
+        r#"
+            DELETE FROM "session" WHERE session = $1
+        "#,
+        session.session_id
+    )
+    .execute(&state.db)
+    .await?;
+
+    Ok((
+        cookies.remove(Cookie::from("session")),
+        Redirect::to("/login"),
     ))
 }
 
