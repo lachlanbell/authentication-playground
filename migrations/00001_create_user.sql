@@ -1,5 +1,5 @@
 CREATE TABLE user (
-    user_id     TEXT PRIMARY KEY,
+    user_id     BLOB PRIMARY KEY NOT NULL,
     username    TEXT UNIQUE NOT NULL
 );
 

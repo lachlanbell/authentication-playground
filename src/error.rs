@@ -42,6 +42,12 @@ pub enum Error {
 
     /// The username already exists.
     UsernameAlreadyExists,
+
+    /// The user does not exist.
+    NoSuchUser,
+
+    /// Invalid credentials.
+    InvalidCredentials,
 }
 
 impl fmt::Display for Error {
@@ -58,6 +64,8 @@ impl fmt::Display for Error {
             Error::ExpiredSessionToken => "the session token has expired",
             Error::DatabaseError(inner) => return write!(f, "database error: {inner}"),
             Error::UsernameAlreadyExists => "the username already exists",
+            Error::NoSuchUser => "the user does not exist",
+            Error::InvalidCredentials => "invalid credentials",
         })
     }
 }
@@ -88,6 +96,10 @@ impl From<sqlx::Error> for Error {
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
-        StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        if cfg!(not(debug_assertions)) {
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        } else {
+            (StatusCode::INTERNAL_SERVER_ERROR, format!("{}", self)).into_response()
+        }
     }
 }

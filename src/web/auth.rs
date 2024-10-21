@@ -1,13 +1,18 @@
 #![allow(dead_code)]
 
-use axum::extract::State;
+use axum::extract::{FromRequestParts, State};
+use axum::http::request::Parts;
 use axum::http::StatusCode;
-use axum::routing::post;
-use axum::{debug_handler, Form, Router};
+use axum::response::{IntoResponse, Redirect};
+use axum::routing::{get, post};
+use axum::{async_trait, debug_handler, Form, RequestPartsExt, Router};
+use axum_extra::extract::cookie::Cookie;
+use axum_extra::extract::CookieJar;
 use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 use chrono::serde::ts_seconds;
 use chrono::{DateTime, Days, SubsecRound, Utc};
 use serde::{Deserialize, Serialize};
+use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use crate::secret_box::SecretBox;
@@ -18,6 +23,8 @@ use super::AppState;
 pub fn routes(state: AppState) -> Router {
     Router::new()
         .route("/register", post(register))
+        .route("/login", post(login))
+        .route("/sessions", get(sessions))
         .with_state(state)
 }
 
@@ -30,6 +37,21 @@ pub struct SessionToken {
     /// Session expiry.
     #[serde(with = "ts_seconds", rename = "exp")]
     pub expiry: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Session {
+    /// Session ID.
+    pub session_id: Uuid,
+
+    /// Session expiry.
+    pub expiry: DateTime<Utc>,
+
+    /// User ID.
+    pub user_id: Uuid,
+
+    /// Username
+    pub username: String,
 }
 
 impl SessionToken {
@@ -74,6 +96,13 @@ struct RegisterPayload {
     password: String,
 }
 
+#[derive(Deserialize)]
+struct UserRecord {
+    user_id: String,
+    username: String,
+    hash: Vec<u8>,
+}
+
 #[debug_handler]
 async fn register(
     State(state): State<AppState>,
@@ -91,19 +120,24 @@ async fn register(
         return Err(Error::UsernameAlreadyExists);
     }
 
-    let user = User { user_id: Uuid::new_v4(), username: payload.username.clone() };
-    let hash = state.hasher.hash(user.user_id.to_string(), payload.password).await?;
+    let user = User {
+        user_id: Uuid::new_v4(),
+        username: payload.username.clone(),
+    };
+
+    let hash = state
+        .hasher
+        .hash(user.user_id.to_string(), payload.password)
+        .await?;
 
     let mut tx = state.db.begin().await?;
-
-    let uuid_string = user.user_id.to_string();
 
     sqlx::query!(
         r#"
             INSERT INTO "user" (user_id, username)
             VALUES ($1, $2)
         "#,
-        uuid_string,
+        user.user_id,
         user.username
     )
     .execute(&mut *tx)
@@ -114,7 +148,7 @@ async fn register(
             INSERT INTO "password" (user_id, hash)
             VALUES ($1, $2)
         "#,
-        uuid_string,
+        user.user_id,
         hash
     )
     .execute(&mut *tx)
@@ -123,6 +157,123 @@ async fn register(
     tx.commit().await?;
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Debug, Deserialize)]
+struct LoginPayload {
+    username: String,
+    password: String,
+}
+
+#[debug_handler]
+async fn login(
+    State(state): State<AppState>,
+    cookies: CookieJar,
+    Form(payload): Form<LoginPayload>,
+) -> Result<impl IntoResponse> {
+    let maybe_user = sqlx::query!(
+        r#"
+        SELECT u.user_id AS "user_id: uuid::Uuid", u.username AS username, p.hash AS password_hash
+        FROM "user" u JOIN password p ON u.user_id = p.user_id
+        WHERE username = $1
+        "#,
+        payload.username
+    )
+    .fetch_optional(&state.db)
+    .await?;
+
+    let Some(user) = maybe_user else {
+        return Err(Error::NoSuchUser);
+    };
+
+    if !(state
+        .hasher
+        .verify(
+            user.user_id.to_string(),
+            payload.password,
+            user.password_hash,
+        )
+        .await?)
+    {
+        return Err(Error::InvalidCredentials);
+    }
+
+    let session = create_session(user.user_id, state.db).await.unwrap();
+    let session_token = session.to_token_string(&state.token_box);
+
+    Ok((
+        cookies.add(Cookie::new("session", session_token)),
+        Redirect::to("/sessions"),
+    ))
+}
+
+async fn sessions(State(state): State<AppState>, session: Session) -> String {
+    format!(
+        "Hello {}. You're logged in with session ID {}.",
+        session.username, session.session_id
+    )
+}
+
+async fn create_session(user_id: Uuid, db: SqlitePool) -> Result<SessionToken> {
+    let token = SessionToken {
+        session: Uuid::new_v4(),
+        expiry: Utc::now()
+            .checked_add_days(Days::new(5))
+            .unwrap()
+            .round_subsecs(0),
+    };
+
+    sqlx::query!(
+        r#"
+            INSERT INTO "session" (session, user_id)
+            VALUES ($1, $2)
+        "#,
+        token.session,
+        user_id
+    )
+    .execute(&db)
+    .await?;
+
+    Ok(token)
+}
+
+#[async_trait]
+impl FromRequestParts<AppState> for Session {
+    type Rejection = Error;
+
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self> {
+        let cookies = parts
+            .extract::<CookieJar>()
+            .await
+            .map_err(|_| Error::InvalidSessionToken)?;
+
+        let Some(session_token) = cookies.get("session") else {
+            return Err(Error::InvalidSessionToken);
+        };
+
+        let decrypted_token =
+            SessionToken::from_token_string(session_token.value().to_string(), &state.token_box)?;
+
+        let Some(user) = sqlx::query!(
+            r#"
+                SELECT s.user_id AS "user_id: uuid::Uuid", u.username FROM "session" s JOIN "user" u on s.user_id = u.user_id
+                WHERE session = $1
+            "#,
+            decrypted_token.session
+        )
+        .fetch_optional(&state.db)
+        .await?
+        else {
+            return Err(Error::InvalidSessionToken);
+        };
+
+        Ok(Session {
+            session_id: decrypted_token.session,
+            expiry: decrypted_token.expiry,
+            user_id: user.user_id,
+            username: user.username,
+        })
+    }
 }
 
 #[test]

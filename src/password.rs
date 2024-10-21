@@ -107,17 +107,14 @@ async fn test_verify_wrong_password() {
         .unwrap();
 
     // Different password => false
-    assert_eq!(
-        hasher
-            .verify(
-                "AzureDiamond".to_string(),
-                "hunter1".to_string(),
-                hash.clone()
-            )
-            .await
-            .unwrap(),
-        false
-    );
+    assert!(!hasher
+        .verify(
+            "AzureDiamond".to_string(),
+            "hunter1".to_string(),
+            hash.clone()
+        )
+        .await
+        .unwrap());
 }
 
 #[tokio::test]
@@ -130,13 +127,10 @@ async fn test_verify_wrong_username() {
         .unwrap();
 
     // Different username => false
-    assert_eq!(
-        hasher
-            .verify("Cthon98".to_string(), "hunter2".to_string(), hash.clone())
-            .await
-            .unwrap(),
-        false
-    );
+    assert!(!hasher
+        .verify("Cthon98".to_string(), "hunter2".to_string(), hash.clone())
+        .await
+        .unwrap());
 }
 
 #[tokio::test]
@@ -150,15 +144,12 @@ async fn test_verify_invalid_pepper() {
 
     // Same password, invalid pepper => false
     let bad_hasher = Hasher::new("sekrit".to_string());
-    assert_eq!(
-        bad_hasher
-            .verify(
-                "AzureDiamond".to_string(),
-                "hunter2".to_string(),
-                hash.clone()
-            )
-            .await
-            .unwrap(),
-        false
-    );
+    assert!(!bad_hasher
+        .verify(
+            "AzureDiamond".to_string(),
+            "hunter2".to_string(),
+            hash.clone()
+        )
+        .await
+        .unwrap());
 }
