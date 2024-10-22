@@ -1,10 +1,13 @@
-use std::{io, sync::Arc};
+use std::{io, str::FromStr, sync::Arc};
 
 use password::Hasher;
 use secret_box::SecretBox;
 use serde::{Deserialize, Serialize};
 
-use sqlx::SqlitePool;
+use sqlx::{
+    sqlite::{SqliteConnectOptions, SqliteJournalMode},
+    SqlitePool,
+};
 
 pub use self::error::{Error, Result};
 
@@ -29,9 +32,13 @@ async fn main() -> io::Result<()> {
 
     let token_box = SecretBox::new(&COOKIE_KEY).unwrap();
     let hasher = Hasher::new("pepper".to_string());
-    let db = SqlitePool::connect(&dotenvy::var("DATABASE_URL").unwrap())
-        .await
-        .unwrap();
+    let db = SqlitePool::connect_with(
+        SqliteConnectOptions::from_str(&dotenvy::var("DATABASE_URL").unwrap())
+            .unwrap()
+            .journal_mode(SqliteJournalMode::Wal),
+    )
+    .await
+    .unwrap();
 
     let state = web::AppState {
         token_box: Arc::new(token_box),
