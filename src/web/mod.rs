@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use axum::{routing::get, Json, Router};
+use axum::{response::Redirect, routing::get, Json, Router};
 use serde::Serialize;
 pub use state::AppState;
 
@@ -10,7 +10,8 @@ mod state;
 pub async fn serve(state: AppState) {
     let app = Router::new()
         .merge(auth::routes(state))
-        .route("/up", get(up));
+        .route("/up", get(up))
+        .route("/", get(Redirect::to("/login")));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
 

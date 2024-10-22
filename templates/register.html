@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
+<title>Create an account</title>
+<header>
+    <h1>Create an account</h1>
+</header>
+<main>
+    {% if let Some(error) = error %}
+    <p><strong>Error</strong>: {{ error }}</p>
+    {% endif %}
+    <form action="/register" method="post">
+        <p>
+            <label>Username</label>
+            <input type="text" name="username">
+        </p>
+        <p>
+            <label>Password</label>
+            <input type="password" name="password">
+        </p>
+        <p>
+            <input type="submit" value="Create">
+        </p>
+    </form>
+    <a href="/login">I already have an account</a>
+</main>

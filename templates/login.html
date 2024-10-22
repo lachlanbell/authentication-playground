@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
+<title>Login</title>
+<header>
+    <h1>Login</h1>
+</header>
+<main>
+    {% if let Some(error) = error %}
+    <p><strong>Error</strong>: {{ error }}</p>
+    {% endif %}
+    <form action="/login" method="post">
+        <p>
+            <label>Username</label>
+            <input type="text" name="username">
+        </p>
+        <p>
+            <label>Password</label>
+            <input type="password" name="password">
+        </p>
+        <p>
+            <input type="submit" value="Login">
+        </p>
+    </form>
+    <a href="/register">Create an account</a>
+</main>

@@ -1,9 +1,10 @@
 #![allow(dead_code)]
 
+use askama::Template;
 use axum::extract::{FromRequestParts, State};
 use axum::http::request::Parts;
 use axum::http::StatusCode;
-use axum::response::{IntoResponse, Redirect};
+use axum::response::{IntoResponse, Redirect, Response};
 use axum::routing::{get, post};
 use axum::{async_trait, debug_handler, Form, RequestPartsExt, Router};
 use axum_extra::extract::cookie::Cookie;
@@ -22,10 +23,12 @@ use super::AppState;
 
 pub fn routes(state: AppState) -> Router {
     Router::new()
-        .route("/register", post(register))
         .route("/login", post(login))
+        .route("/register", post(register))
+        .route("/login", get(login_form))
+        .route("/register", get(register_form))
         .route("/sessions", get(sessions))
-        .route("/logout", post(logout))
+        .route("/logout", get(logout))
         .with_state(state)
 }
 
@@ -108,7 +111,7 @@ struct UserRecord {
 async fn register(
     State(state): State<AppState>,
     Form(payload): Form<RegisterPayload>,
-) -> Result<StatusCode> {
+) -> Result<Response> {
     let maybe_user = sqlx::query!(
         r#"SELECT user_id FROM "user" WHERE username = $1"#,
         payload.username
@@ -118,7 +121,13 @@ async fn register(
 
     if maybe_user.is_some() {
         // The user already exists.
-        return Err(Error::UsernameAlreadyExists);
+        return Ok((
+            StatusCode::UNAUTHORIZED,
+            RegisterTemplate {
+                error: Some(format!("{}", Error::UsernameAlreadyExists)),
+            },
+        )
+            .into_response());
     }
 
     let user = User {
@@ -157,7 +166,7 @@ async fn register(
 
     tx.commit().await?;
 
-    Ok(StatusCode::NO_CONTENT)
+    Ok(Redirect::to("/login").into_response())
 }
 
 #[derive(Debug, Deserialize)]
@@ -171,7 +180,7 @@ async fn login(
     State(state): State<AppState>,
     cookies: CookieJar,
     Form(payload): Form<LoginPayload>,
-) -> Result<impl IntoResponse> {
+) -> Result<Response> {
     let maybe_user = sqlx::query!(
         r#"
         SELECT u.user_id AS "user_id: uuid::Uuid", u.username AS username, p.hash AS password_hash
@@ -184,7 +193,13 @@ async fn login(
     .await?;
 
     let Some(user) = maybe_user else {
-        return Err(Error::NoSuchUser);
+        return Ok((
+            StatusCode::UNAUTHORIZED,
+            LoginTemplate {
+                error: Some(format!("{}", Error::NoSuchUser)),
+            },
+        )
+            .into_response());
     };
 
     if !(state
@@ -196,7 +211,13 @@ async fn login(
         )
         .await?)
     {
-        return Err(Error::InvalidCredentials);
+        return Ok((
+            StatusCode::UNAUTHORIZED,
+            LoginTemplate {
+                error: Some(format!("{}", Error::InvalidCredentials)),
+            },
+        )
+            .into_response());
     }
 
     let session = create_session(user.user_id, state.db).await.unwrap();
@@ -205,7 +226,36 @@ async fn login(
     Ok((
         cookies.add(Cookie::new("session", session_token)),
         Redirect::to("/sessions"),
-    ))
+    )
+        .into_response())
+}
+
+#[derive(Template)]
+#[template(path = "login.html")]
+struct LoginTemplate {
+    error: Option<String>,
+}
+
+async fn login_form(session: Option<Session>) -> Response {
+    if session.is_some() {
+        return Redirect::to("/sessions").into_response();
+    }
+
+    LoginTemplate { error: None }.into_response()
+}
+
+#[derive(Template)]
+#[template(path = "register.html")]
+struct RegisterTemplate {
+    error: Option<String>,
+}
+
+async fn register_form(session: Option<Session>) -> Response {
+    if session.is_some() {
+        return Redirect::to("/sessions").into_response();
+    }
+
+    RegisterTemplate { error: None }.into_response()
 }
 
 async fn logout(
@@ -228,11 +278,39 @@ async fn logout(
     ))
 }
 
-async fn sessions(State(state): State<AppState>, session: Session) -> String {
-    format!(
-        "Hello {}. You're logged in with session ID {}.",
-        session.username, session.session_id
+#[derive(Template)]
+#[template(path = "sessions.html")]
+struct SessionsTemplate {
+    username: String,
+    session_id: String,
+    sessions: Vec<String>,
+}
+
+async fn sessions(State(state): State<AppState>, session: Session) -> Result<SessionsTemplate> {
+    let sessions: Vec<String> = sqlx::query!(
+        r#"
+            SELECT session AS "session: uuid::Uuid" FROM "session"
+            WHERE user_id = $1
+        "#,
+        session.user_id
     )
+    .fetch_all(&state.db)
+    .await?
+    .into_iter()
+    .filter_map(|record| {
+        if let Some(session) = record.session {
+            return Some(session.to_string());
+        }
+
+        None
+    })
+    .collect();
+
+    Ok(SessionsTemplate {
+        username: session.username,
+        session_id: session.session_id.to_string(),
+        sessions,
+    })
 }
 
 async fn create_session(user_id: Uuid, db: SqlitePool) -> Result<SessionToken> {

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
+<title>Sessions</title>
+<header>
+    <nav>
+        <a href="/logout">Logout</a>
+      </nav>
+    <h1>Sessions</h1>
+    <p>Hello {{ username }}.<br>You are session <code>{{ session_id }}</code>.</p>
+</header>
+<main>
+    <table>
+        <caption>Active Sessions</caption>
+        <thead>
+            <tr>
+              <th>Session ID</th>
+            </tr>
+          </thead>
+        <tbody>
+            {% for session in sessions %}
+            <tr>
+                <td>{{ session }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</main>
