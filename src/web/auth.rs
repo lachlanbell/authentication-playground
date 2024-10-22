@@ -113,7 +113,7 @@ async fn register(
     Form(payload): Form<RegisterPayload>,
 ) -> Result<Response> {
     let maybe_user = sqlx::query!(
-        r#"SELECT user_id FROM "user" WHERE username = $1"#,
+        r#"SELECT user_id FROM "user" WHERE LOWER(username) = LOWER($1)"#,
         payload.username
     )
     .fetch_optional(&state.db)
@@ -185,7 +185,7 @@ async fn login(
         r#"
         SELECT u.user_id AS "user_id: uuid::Uuid", u.username AS username, p.hash AS password_hash
         FROM "user" u JOIN password p ON u.user_id = p.user_id
-        WHERE username = $1
+        WHERE LOWER(username) = LOWER($1)
         "#,
         payload.username
     )
