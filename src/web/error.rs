@@ -1,7 +1,7 @@
 use askama::Template;
 use axum::{
     http::StatusCode,
-    response::{IntoResponse, Response},
+    response::{IntoResponse, Redirect, Response},
 };
 
 use crate::Error;
@@ -15,24 +15,31 @@ struct ErrorTemplate {
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
-        if cfg!(not(debug_assertions)) {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                ErrorTemplate {
-                    error: "Internal Server Error".to_string(),
-                    description: None,
-                },
-            )
-                .into_response()
-        } else {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                ErrorTemplate {
-                    error: "Internal Server Error".to_string(),
-                    description: Some(format!("{}", self)),
-                },
-            )
-                .into_response()
+        match self {
+            Self::ExpiredSessionToken | Self::InvalidSessionToken => {
+                Redirect::to("/login").into_response()
+            }
+            _ => {
+                if cfg!(feature = "web_errors") {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        ErrorTemplate {
+                            error: "Internal Server Error".to_string(),
+                            description: Some(format!("{}", self)),
+                        },
+                    )
+                        .into_response()
+                } else {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        ErrorTemplate {
+                            error: "Internal Server Error".to_string(),
+                            description: None,
+                        },
+                    )
+                        .into_response()
+                }
+            }
         }
     }
 }
