@@ -5,6 +5,7 @@ use serde::Serialize;
 pub use state::AppState;
 
 mod auth;
+mod error;
 mod state;
 
 pub async fn serve(state: AppState) {

@@ -1,10 +1,5 @@
 use core::fmt;
 
-use axum::{
-    http::StatusCode,
-    response::{IntoResponse, Response},
-};
-
 pub type Result<T> = core::result::Result<T, Error>;
 
 /// Error type.
@@ -91,15 +86,5 @@ impl From<tokio::task::JoinError> for Error {
 impl From<sqlx::Error> for Error {
     fn from(value: sqlx::Error) -> Self {
         Error::DatabaseError(value.to_string())
-    }
-}
-
-impl IntoResponse for Error {
-    fn into_response(self) -> Response {
-        if cfg!(not(debug_assertions)) {
-            StatusCode::INTERNAL_SERVER_ERROR.into_response()
-        } else {
-            (StatusCode::INTERNAL_SERVER_ERROR, format!("{}", self)).into_response()
-        }
     }
 }
