@@ -1,7 +1,10 @@
 #![allow(dead_code)]
 
+use std::collections::HashMap;
+use std::str::FromStr;
+
 use askama::Template;
-use axum::extract::{FromRequestParts, State};
+use axum::extract::{FromRequestParts, Path, State};
 use axum::http::request::Parts;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Redirect, Response};
@@ -29,6 +32,7 @@ pub fn routes(state: AppState) -> Router {
         .route("/register", get(register_form))
         .route("/sessions", get(sessions))
         .route("/logout", get(logout))
+        .route("/revoke/:session_id", get(revoke_session))
         .with_state(state)
 }
 
@@ -304,6 +308,45 @@ async fn logout(
         cookies.remove(Cookie::from("session")),
         Redirect::to("/login"),
     ))
+}
+
+async fn revoke_session(
+    State(state): State<AppState>,
+    session: Session,
+    Path(params): Path<HashMap<String, String>>,
+) -> Result<Redirect> {
+    let session_string = params.get("session_id").ok_or(Error::BadRequest)?;
+    let session_id = Uuid::from_str(&session_string).map_err(|_| Error::BadRequest)?;
+
+    let session_record = sqlx::query!(
+        r#"
+        SELECT session AS "session: uuid::Uuid", user_id AS "user_id: uuid::Uuid"
+        FROM "session" WHERE session = $1
+        "#,
+        session_id
+    )
+    .fetch_optional(&state.db)
+    .await?;
+
+    let Some(session_record) = session_record else {
+        return Err(Error::BadRequest);
+    };
+
+    if session_record.user_id != session.user_id {
+        return Err(Error::BadRequest);
+    }
+
+    sqlx::query!(
+        r#"
+            DELETE FROM "session" WHERE session = $1 AND user_id = $2
+        "#,
+        session_record.session,
+        session_record.user_id
+    )
+    .execute(&state.db)
+    .await?;
+
+    Ok(Redirect::to("/sessions"))
 }
 
 #[derive(Template)]

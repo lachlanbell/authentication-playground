@@ -19,6 +19,14 @@ impl IntoResponse for Error {
             Self::ExpiredSessionToken | Self::InvalidSessionToken => {
                 Redirect::to("/login").into_response()
             }
+            Self::BadRequest => (
+                StatusCode::BAD_REQUEST,
+                ErrorTemplate {
+                    error: "Bad Request".to_string(),
+                    description: None,
+                },
+            )
+                .into_response(),
             _ => {
                 if cfg!(feature = "web_errors") {
                     (

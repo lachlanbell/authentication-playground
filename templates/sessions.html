@@ -15,13 +15,15 @@
         <caption>Active Sessions</caption>
         <thead>
             <tr>
-              <th>Session ID</th>
+                <th>Session ID</th>
+                <th></th>
             </tr>
           </thead>
         <tbody>
             {% for session in sessions %}
             <tr>
                 <td>{{ session }}</td>
+                <td><a href="/revoke/{{ session }}">Revoke</a></td>
             </tr>
             {% endfor %}
         </tbody>

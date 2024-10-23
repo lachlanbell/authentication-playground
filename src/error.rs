@@ -49,6 +49,9 @@ pub enum Error {
 
     /// The password too short.
     PasswordTooShort,
+
+    /// Generic bad request.
+    BadRequest,
 }
 
 impl fmt::Display for Error {
@@ -69,6 +72,7 @@ impl fmt::Display for Error {
             Error::InvalidCredentials => "invalid credentials",
             Error::UsernameTooShort => "the username is too short",
             Error::PasswordTooShort => "the password is too short",
+            Error::BadRequest => "bad request",
         })
     }
 }
