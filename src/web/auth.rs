@@ -9,7 +9,7 @@ use axum::http::request::Parts;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::routing::{get, post};
-use axum::{async_trait, debug_handler, Form, RequestPartsExt, Router};
+use axum::{async_trait, Form, RequestPartsExt, Router};
 use axum_extra::extract::cookie::Cookie;
 use axum_extra::extract::CookieJar;
 use base64::{engine::general_purpose::URL_SAFE, Engine as _};
@@ -58,7 +58,7 @@ pub struct Session {
     /// User ID.
     pub user_id: Uuid,
 
-    /// Username
+    /// Username.
     pub username: String,
 }
 
@@ -316,7 +316,7 @@ async fn revoke_session(
     Path(params): Path<HashMap<String, String>>,
 ) -> Result<Redirect> {
     let session_string = params.get("session_id").ok_or(Error::BadRequest)?;
-    let session_id = Uuid::from_str(&session_string).map_err(|_| Error::BadRequest)?;
+    let session_id = Uuid::from_str(session_string).map_err(|_| Error::BadRequest)?;
 
     let session_record = sqlx::query!(
         r#"
