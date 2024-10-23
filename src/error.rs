@@ -43,6 +43,12 @@ pub enum Error {
 
     /// Invalid credentials.
     InvalidCredentials,
+
+    /// The username too short.
+    UsernameTooShort,
+
+    /// The password too short.
+    PasswordTooShort,
 }
 
 impl fmt::Display for Error {
@@ -61,6 +67,8 @@ impl fmt::Display for Error {
             Error::UsernameAlreadyExists => "the username already exists",
             Error::NoSuchUser => "the user does not exist",
             Error::InvalidCredentials => "invalid credentials",
+            Error::UsernameTooShort => "the username is too short",
+            Error::PasswordTooShort => "the password is too short",
         })
     }
 }

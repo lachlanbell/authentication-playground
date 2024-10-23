@@ -107,11 +107,30 @@ struct UserRecord {
     hash: Vec<u8>,
 }
 
-#[debug_handler]
 async fn register(
     State(state): State<AppState>,
     Form(payload): Form<RegisterPayload>,
 ) -> Result<Response> {
+    if payload.username.is_empty() {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            RegisterTemplate {
+                error: Some(format!("{}", Error::UsernameTooShort)),
+            },
+        )
+            .into_response());
+    }
+
+    if payload.password.is_empty() {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            RegisterTemplate {
+                error: Some(format!("{}", Error::PasswordTooShort)),
+            },
+        )
+            .into_response());
+    }
+
     let maybe_user = sqlx::query!(
         r#"SELECT user_id FROM "user" WHERE LOWER(username) = LOWER($1)"#,
         payload.username
@@ -122,7 +141,7 @@ async fn register(
     if maybe_user.is_some() {
         // The user already exists.
         return Ok((
-            StatusCode::UNAUTHORIZED,
+            StatusCode::BAD_REQUEST,
             RegisterTemplate {
                 error: Some(format!("{}", Error::UsernameAlreadyExists)),
             },
@@ -175,12 +194,21 @@ struct LoginPayload {
     password: String,
 }
 
-#[debug_handler]
 async fn login(
     State(state): State<AppState>,
     cookies: CookieJar,
     Form(payload): Form<LoginPayload>,
 ) -> Result<Response> {
+    if payload.username.is_empty() || payload.password.is_empty() {
+        return Ok((
+            StatusCode::UNAUTHORIZED,
+            LoginTemplate {
+                error: Some(format!("{}", Error::InvalidCredentials)),
+            },
+        )
+            .into_response());
+    }
+
     let maybe_user = sqlx::query!(
         r#"
         SELECT u.user_id AS "user_id: uuid::Uuid", u.username AS username, p.hash AS password_hash
