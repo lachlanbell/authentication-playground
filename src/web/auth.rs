@@ -104,13 +104,6 @@ struct RegisterPayload {
     password: String,
 }
 
-#[derive(Deserialize)]
-struct UserRecord {
-    user_id: String,
-    username: String,
-    hash: Vec<u8>,
-}
-
 async fn register(
     State(state): State<AppState>,
     Form(payload): Form<RegisterPayload>,
